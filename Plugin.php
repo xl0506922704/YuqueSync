@@ -11,6 +11,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  */
 class YuqueSync_Plugin implements Typecho_Plugin_Interface
 {
+
     /**
      * 激活插件方法,如果激活失败,直接抛出异常
      *
@@ -61,11 +62,23 @@ class YuqueSync_Plugin implements Typecho_Plugin_Interface
     {
     }
 
+
     /**
      * 插件实现方法
      */
     public static function render($post)
     {
+        /* 获取插件配置 */
+        $config = Typecho_Widget::widget('Widget_Options')->plugin('YuqueSync');
+        $token = $config->token;
+        $namespace = $config->namespace;
+
+        $client = Typecho_Http_Client::get();
+        $client->setMethod('GET');
+        $client->setHeader('User-Agent', 'Typecho-Yuque-Sync');
+        $client->setHeader('X-Auth-Token', $token);
+        $client->send("https://www.yuque.com/api/v2/repos/{$namespace}/docs");
+        $result = json_decode($client->getResponseBody());
         //Typecho_Widget::widget('Widget_Options')->to($options);
         //$options->index('/action/yuque-sync?slug=');
         echo <<<EOT
@@ -87,7 +100,7 @@ class YuqueSync_Plugin implements Typecho_Plugin_Interface
                         //console.log(res.data.body);
                         $('#slug').val(slug);
                         $('#title').val(res.data.title);
-                        $('#text').val(res.data.custom_description + more_desc + res.data.body);
+                        $('#text').val(more_desc + res.data.body);
                     }
                 }
             });
@@ -97,10 +110,18 @@ class YuqueSync_Plugin implements Typecho_Plugin_Interface
         <section id="custom-field" class="typecho-post-option">
             <label id="custom-field-expand" class="typecho-label">同步语雀</label>
             <br>
-            Slug <input id="yuque_slug" type="text" value="{$post->slug}" placeholder="slug" style="150px">
+            Slug <select name="docs" id="yuque_slug">
+EOT;
+            foreach($result-> data as $doc){
+                $title=trim(json_encode($doc-> title,JSON_UNESCAPED_UNICODE),'"');
+                $slug=trim(json_encode($doc-> slug,JSON_UNESCAPED_UNICODE),'"');
+                echo  "<option value='$slug'>$title</option>";
+            } 
+            echo <<<EOT
+            </select>
             <button type="button" class="btn" onclick="yuque_sync()">获取</button>
             <span>（将会覆盖当前 slug、标题和文章内容）</span>
         </section>
-EOT;
+EOT;    
     }
 }
